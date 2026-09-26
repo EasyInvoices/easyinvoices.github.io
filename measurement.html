@@ -1,0 +1,410 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Area Measurement & Calculation Tool — Easy Invoice</title>
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- FontAwesome Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <!-- html2canvas for Image Download -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+  <style>
+    /* Styling print styles and export modes */
+    @media print {
+      body * { visibility: hidden; }
+      #printable-area, #printable-area * { visibility: visible; }
+      #printable-area { position: absolute; left: 0; top: 0; width: 100%; margin: 0; padding: 15px; box-shadow: none !important; }
+      .no-print { display: none !important; }
+      .print-only-table { display: table !important; }
+      .interactive-only { display: none !important; }
+    }
+    .print-only-table { display: none; }
+  </style>
+</head>
+<body class="bg-slate-50 text-slate-800 min-h-screen flex flex-col font-sans antialiased">
+  <header class="sticky top-0 z-40 bg-white shadow-sm no-print">
+    <div class="max-w-7xl mx-auto px-4 py-3 flex justify-between items-center">
+      <a href="index.html" class="flex items-center gap-2.5 focus:outline-none group">
+        <div class="w-10 h-10 rounded-full bg-slate-900 text-white flex items-center justify-center text-lg group-hover:bg-slate-700 transition">
+          <i class="fa-solid fa-file-invoice-dollar"></i>
+        </div>
+        <span class="tracking-tight text-slate-900 font-bold text-lg md:text-xl">Easy Invoice</span>
+      </a>
+      <a href="index.html" class="px-3.5 py-2 rounded-xl text-xs md:text-sm font-semibold bg-slate-100 hover:bg-slate-200 text-slate-700 transition flex items-center gap-1.5">
+        <i class="fa-solid fa-arrow-left"></i>
+        <span>Back to Home</span>
+      </a>
+    </div>
+  </header>
+
+  <main class="flex-grow max-w-4xl w-full mx-auto px-3 md:px-4 py-6 space-y-6">
+    <!-- Controls & Actions -->
+    <div class="bg-white p-4 md:p-6 rounded-3xl shadow-sm border border-slate-200 flex flex-col sm:flex-row justify-between items-center gap-4 no-print">
+      <div>
+        <h1 class="text-xl md:text-2xl font-black text-slate-900 flex items-center gap-2">
+          <i class="fa-solid fa-ruler-combined text-amber-500"></i>
+          <span>Area Measurement Calculator</span>
+        </h1>
+        <p class="text-xs text-slate-500">Measure room dimensions in feet & inches, calculate square footage/meters, and export pristine tabular reports.</p>
+      </div>
+      <div class="flex items-center gap-2 w-full sm:w-auto">
+        <button onclick="downloadAsImage()" class="flex-1 sm:flex-none px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-semibold transition flex items-center justify-center gap-2 text-sm shadow-sm">
+          <i class="fa-solid fa-file-image"></i>
+          <span>Image</span>
+        </button>
+        <button onclick="window.print()" class="flex-1 sm:flex-none px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-semibold transition flex items-center justify-center gap-2 text-sm shadow-sm">
+          <i class="fa-solid fa-print"></i>
+          <span>Print / PDF</span>
+        </button>
+      </div>
+    </div>
+
+    <div id="printable-area" class="bg-white p-4 sm:p-6 md:p-10 rounded-3xl shadow-xl border border-slate-200 space-y-6">
+      <!-- Header Info -->
+      <div class="flex flex-col sm:flex-row justify-between items-start border-b pb-6 gap-4">
+        <div>
+          <h2 id="sheet-firm-name" class="text-xl font-black text-slate-900">Your Firm Name</h2>
+          <p id="sheet-firm-address" class="text-xs text-slate-500 mt-0.5 whitespace-pre-line"></p>
+        </div>
+        <div class="text-left sm:text-right w-full sm:w-auto">
+          <h3 class="text-lg font-bold text-amber-600 uppercase tracking-wider">Measurement Sheet</h3>
+          <p class="text-xs text-slate-500 mt-1">Date: <span id="sheet-date"></span></p>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4 bg-slate-50 p-4 rounded-2xl border border-slate-100 no-print">
+        <div class="relative">
+          <label class="block text-xs font-bold text-slate-700 mb-1">Select / Search Client</label>
+          <input type="text" id="client-search" placeholder="Type client name..." oninput="handleClientSearch()" class="w-full px-3.5 py-2.5 bg-white border rounded-xl text-sm outline-none focus:ring-2 focus:ring-amber-500" autocomplete="off">
+          <div id="client-dropdown" class="absolute left-0 right-0 top-full mt-1 bg-white border border-slate-200 rounded-xl shadow-lg max-h-40 overflow-y-auto z-30 hidden"></div>
+        </div>
+        <div>
+          <label class="block text-xs font-bold text-slate-700 mb-1">Calculation Unit</label>
+          <select id="measurement-unit" onchange="renderRows()" class="w-full px-3.5 py-2.5 bg-white border rounded-xl text-sm outline-none focus:ring-2 focus:ring-amber-500">
+            <option value="sqft">Square Feet (Sq. Ft.)</option>
+            <option value="sqm">Square Meters (Sq. Mtrs)</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Static Client View for Print/Export -->
+      <div id="client-print-view" class="hidden bg-slate-50 p-4 rounded-2xl border border-slate-100">
+        <h4 class="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1">Client Details:</h4>
+        <p id="print-client-name" class="font-bold text-slate-900 text-sm"></p>
+        <p id="print-client-contact" class="text-xs text-slate-600"></p>
+        <p id="print-client-address" class="text-xs text-slate-600 whitespace-pre-line"></p>
+      </div>
+
+      <div class="space-y-4">
+        <div class="flex justify-between items-center">
+          <h4 class="text-xs font-bold text-slate-700 uppercase tracking-wider">Rooms & Areas</h4>
+          <button onclick="addMeasurementRow()" class="no-print px-3.5 py-2 bg-amber-500 hover:bg-amber-600 text-white rounded-xl text-xs font-bold shadow-sm transition flex items-center gap-1.5">
+            <i class="fa-solid fa-plus"></i> Add Room
+          </button>
+        </div>
+
+        <!-- Interactive Rooms Container (Cards for data entry) -->
+        <div id="measurement-rows-container" class="space-y-3 interactive-only"></div>
+
+        <!-- Professional Export Table Format -->
+        <div id="export-table-container" class="print-only-table w-full overflow-x-auto border border-slate-200 rounded-2xl bg-white">
+          <table class="w-full text-left border-collapse">
+            <thead>
+              <tr class="bg-slate-100 border-b border-slate-200 text-slate-700 text-xs uppercase tracking-wider">
+                <th class="p-3 font-bold">Area (like room name etc)</th>
+                <th class="p-3 font-bold">Length</th>
+                <th class="p-3 font-bold">Width</th>
+                <th class="p-3 font-bold text-right">Total</th>
+              </tr>
+            </thead>
+            <tbody id="export-table-body" class="divide-y divide-slate-100 text-xs text-slate-800">
+              <!-- Dynamically populated tabular rows -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="flex justify-end pt-2">
+        <div class="w-full sm:w-80 bg-amber-50 p-4 rounded-2xl border border-amber-200 space-y-2">
+          <div class="flex justify-between text-sm font-bold text-amber-900">
+            <span>Total Area:</span>
+            <span id="grand-total-area">0.00 Sq. Ft.</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="space-y-2 pt-2 no-print">
+        <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider">Additional Description / Notes</label>
+        <textarea id="measurement-notes" rows="3" placeholder="Enter any extra notes or specifications regarding measurements..." class="w-full px-3.5 py-2.5 border rounded-2xl text-xs outline-none focus:ring-2 focus:ring-amber-500"></textarea>
+      </div>
+      <div id="export-notes-display" class="hidden space-y-1 pt-2">
+        <h5 class="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Notes:</h5>
+        <p id="print-notes-text" class="text-xs text-slate-700 whitespace-pre-line"></p>
+      </div>
+
+      <!-- Footer Signature -->
+      <div class="pt-8 flex justify-between items-end border-t border-slate-200">
+        <div>
+          <p class="text-[10px] text-slate-400">Computer-generated measurement sheet.</p>
+         
+        </div>
+        <div class="text-center">
+          <div class="h-10 border-b border-slate-400 mb-1 w-32 md:w-40"></div>
+          <p id="sheet-sign-name" class="text-xs font-bold text-slate-800">Authorized Signatory</p>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <script>
+    let currentUserId = '';
+    let companyProfile = { name: '', address: '', logo: '' };
+    let savedClients = [];
+    let selectedClient = null;
+    let measurementRows = [];
+
+    window.onload = function() {
+      initUserIdentity();
+      loadCompanyProfile();
+      loadSavedClients();
+      document.getElementById('sheet-date').innerText = new Date().toISOString().split('T')[0];
+      renderRows();
+    };
+
+    function initUserIdentity() {
+      let userId = localStorage.getItem('easyinvoice_user_id');
+      if (!userId) {
+        userId = 'usr_' + Math.random().toString(36).substr(2, 9) + '_' + Date.now();
+        localStorage.setItem('easyinvoice_user_id', userId);
+      }
+      currentUserId = userId;
+    }
+
+    function loadCompanyProfile() {
+      const stored = localStorage.getItem(`easyinvoice_${currentUserId}_profile`) || localStorage.getItem('easyinvoice_profile');
+      if (stored) {
+        companyProfile = JSON.parse(stored);
+        document.getElementById('sheet-firm-name').innerText = companyProfile.name || 'Your Firm Name';
+        document.getElementById('sheet-firm-address').innerText = companyProfile.address || '';
+        document.getElementById('sheet-sign-name').innerText = companyProfile.name || 'Authorized Signatory';
+      }
+    }
+
+    function loadSavedClients() {
+      const stored = localStorage.getItem(`easyinvoice_${currentUserId}_clients`) || localStorage.getItem('easyinvoice_clients');
+      if (stored) savedClients = JSON.parse(stored);
+    }
+
+    function handleClientSearch() {
+      const query = document.getElementById('client-search').value.trim().toLowerCase();
+      const dropdown = document.getElementById('client-dropdown');
+      if (!query) {
+        dropdown.classList.add('hidden');
+        selectedClient = null;
+        updateClientPrintView();
+        return;
+      }
+      const matches = savedClients.filter(c => c.name.toLowerCase().includes(query));
+      if (matches.length > 0) {
+        dropdown.innerHTML = '';
+        matches.forEach(m => {
+          const div = document.createElement('div');
+          div.className = 'px-4 py-2.5 hover:bg-slate-50 cursor-pointer text-xs border-b last:border-b-0';
+          div.innerHTML = `<div class="font-bold text-slate-800">${m.name}</div><div class="text-slate-500">${m.mobile || ''}</div>`;
+          div.onmousedown = function() { selectClient(m); };
+          dropdown.appendChild(div);
+        });
+        dropdown.classList.remove('hidden');
+      } else {
+        dropdown.classList.add('hidden');
+      }
+    }
+
+    function selectClient(client) {
+      selectedClient = client;
+      document.getElementById('client-search').value = client.name;
+      document.getElementById('client-dropdown').classList.add('hidden');
+      updateClientPrintView();
+    }
+
+    function updateClientPrintView() {
+      const printView = document.getElementById('client-print-view');
+      if (selectedClient) {
+        document.getElementById('print-client-name').innerText = selectedClient.name;
+        document.getElementById('print-client-contact').innerText = [selectedClient.mobile, selectedClient.email].filter(Boolean).join(' | ');
+        document.getElementById('print-client-address').innerText = selectedClient.address || '';
+        printView.classList.remove('hidden');
+      } else {
+        printView.classList.add('hidden');
+      }
+    }
+
+    function addMeasurementRow() {
+      measurementRows.push({ name: 'Room ' + (measurementRows.length + 1), lenFt: 0, lenIn: 0, widFt: 0, widIn: 0 });
+      renderRows();
+    }
+
+    function removeMeasurementRow(index) {
+      measurementRows.splice(index, 1);
+      renderRows();
+    }
+
+    function renderRows() {
+      const container = document.getElementById('measurement-rows-container');
+      const tableBody = document.getElementById('export-table-body');
+      container.innerHTML = '';
+      tableBody.innerHTML = '';
+
+      const unitType = document.getElementById('measurement-unit').value;
+      let totalSqFt = 0;
+
+      if (measurementRows.length === 0) {
+        container.innerHTML = `<div class="p-6 text-center text-slate-400 italic bg-slate-50 rounded-2xl border border-dashed border-slate-200">No rooms added yet. Click "Add Room" to start measuring.</div>`;
+        tableBody.innerHTML = `<tr><td colspan="4" class="p-6 text-center text-slate-400 italic">No rooms added.</td></tr>`;
+      }
+
+      measurementRows.forEach((row, idx) => {
+        let lengthInches = (row.lenFt || 0) * 12 + (row.lenIn || 0);
+        let widthInches = (row.widFt || 0) * 12 + (row.widIn || 0);
+        let sqFt = (lengthInches * widthInches) / 144;
+        totalSqFt += sqFt;
+
+        let displayArea = unitType === 'sqm' ? (sqFt / 10.764).toFixed(2) + ' Sq. Mtrs' : sqFt.toFixed(2) + ' Sq. Ft.';
+        let lengthStr = `${row.lenFt || 0}' ${row.lenIn || 0}"`;
+        let widthStr = `${row.widFt || 0}' ${row.widIn || 0}"`;
+
+        // 1. Render Interactive Card
+        const card = document.createElement('div');
+        card.className = 'bg-slate-50 p-3.5 sm:p-4 rounded-2xl border border-slate-200 space-y-3 relative';
+        card.innerHTML = `
+          <div class="flex items-center justify-between gap-2">
+            <div class="flex items-center gap-2 flex-grow">
+              <span class="w-6 h-6 rounded-full bg-amber-500 text-white font-bold text-xs flex items-center justify-center shrink-0">${idx + 1}</span>
+              <input type="text" value="${row.name}" oninput="measurementRows[${idx}].name = this.value; updateTableLive();" placeholder="Room Name (e.g. Kitchen)" class="w-full px-3 py-1.5 border rounded-xl bg-white outline-none text-xs font-bold text-slate-800">
+            </div>
+            <button onclick="removeMeasurementRow(${idx})" class="p-2 bg-rose-50 hover:bg-rose-100 text-rose-600 rounded-xl transition shrink-0" title="Remove Room">
+              <i class="fa-solid fa-trash text-xs"></i>
+            </button>
+          </div>
+
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+            <div class="bg-white p-2.5 rounded-xl border border-slate-200 space-y-1">
+              <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider">Length</label>
+              <div class="flex items-center gap-1.5">
+                <div class="flex items-center gap-1 flex-1">
+                  <input type="number" value="${row.lenFt}" min="0" oninput="measurementRows[${idx}].lenFt = parseFloat(this.value) || 0; updateMeasurementLive(${idx});" class="w-full px-2 py-1.5 border rounded-lg bg-slate-50 text-center outline-none text-xs" placeholder="0">
+                  <span class="text-slate-400 text-xs">ft</span>
+                </div>
+                <div class="flex items-center gap-1 flex-1">
+                  <input type="number" value="${row.lenIn}" min="0" max="11" oninput="measurementRows[${idx}].lenIn = parseFloat(this.value) || 0; updateMeasurementLive(${idx});" class="w-full px-2 py-1.5 border rounded-lg bg-slate-50 text-center outline-none text-xs" placeholder="0">
+                  <span class="text-slate-400 text-xs">in</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="bg-white p-2.5 rounded-xl border border-slate-200 space-y-1">
+              <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider">Width</label>
+              <div class="flex items-center gap-1.5">
+                <div class="flex items-center gap-1 flex-1">
+                  <input type="number" value="${row.widFt}" min="0" oninput="measurementRows[${idx}].widFt = parseFloat(this.value) || 0; updateMeasurementLive(${idx});" class="w-full px-2 py-1.5 border rounded-lg bg-slate-50 text-center outline-none text-xs" placeholder="0">
+                  <span class="text-slate-400 text-xs">ft</span>
+                </div>
+                <div class="flex items-center gap-1 flex-1">
+                  <input type="number" value="${row.widIn}" min="0" max="11" oninput="measurementRows[${idx}].widIn = parseFloat(this.value) || 0; updateMeasurementLive(${idx});" class="w-full px-2 py-1.5 border rounded-lg bg-slate-50 text-center outline-none text-xs" placeholder="0">
+                  <span class="text-slate-400 text-xs">in</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="flex justify-between items-center pt-2 border-t border-slate-200/60 text-xs">
+            <span class="text-slate-500 font-medium">Calculated Area:</span>
+            <span class="font-bold text-amber-600 text-sm" data-row-area>${displayArea}</span>
+          </div>
+        `;
+        container.appendChild(card);
+
+        // 2. Render Export Tabular Row
+        const tr = document.createElement('tr');
+        tr.className = 'border-b border-slate-100 hover:bg-slate-50/50';
+        tr.innerHTML = `
+          <td class="p-3 font-semibold text-slate-900">${row.name || 'Unnamed Room'}</td>
+          <td class="p-3 text-slate-600">${lengthStr}</td>
+          <td class="p-3 text-slate-600">${widthStr}</td>
+          <td class="p-3 text-right font-bold text-amber-700">${displayArea}</td>
+        `;
+        tableBody.appendChild(tr);
+      });
+
+      let finalGrandTotal = unitType === 'sqm' ? (totalSqFt / 10.764).toFixed(2) + ' Sq. Mtrs' : totalSqFt.toFixed(2) + ' Sq. Ft.';
+      document.getElementById('grand-total-area').innerText = finalGrandTotal;
+    }
+
+    function updateMeasurementLive(index) {
+      const row = measurementRows[index];
+      const unitType = document.getElementById('measurement-unit').value;
+      const area = r => (((r.lenFt || 0) * 12 + (r.lenIn || 0)) *
+        ((r.widFt || 0) * 12 + (r.widIn || 0))) / 144;
+      const formatArea = sqFt => unitType === 'sqm'
+        ? (sqFt / 10.764).toFixed(2) + ' Sq. Mtrs'
+        : sqFt.toFixed(2) + ' Sq. Ft.';
+      const card = document.getElementById('measurement-rows-container').children[index];
+      card.querySelector('[data-row-area]').textContent = formatArea(area(row));
+      const cells = document.getElementById('export-table-body').rows[index].cells;
+      cells[1].textContent = `${row.lenFt || 0}' ${row.lenIn || 0}"`;
+      cells[2].textContent = `${row.widFt || 0}' ${row.widIn || 0}"`;
+      cells[3].textContent = formatArea(area(row));
+      document.getElementById('grand-total-area').textContent =
+        formatArea(measurementRows.reduce((total, item) => total + area(item), 0));
+    }
+
+    function updateTableLive() {
+      // Quick updater for room names in export table without full re-render
+      const tableRows = document.querySelectorAll('#export-table-body tr');
+      measurementRows.forEach((row, idx) => {
+        if (tableRows[idx]) {
+          const nameCell = tableRows[idx].querySelector('td:first-child');
+          if (nameCell) nameCell.innerText = row.name || 'Unnamed Room';
+        }
+      });
+    }
+
+    function downloadAsImage() {
+      const element = document.getElementById('printable-area');
+      if (!element) return;
+
+      // Temporarily swap interactive view with export table for pristine image capture
+      const interactiveContainer = document.querySelector('.interactive-only');
+      const exportTable = document.getElementById('export-table-container');
+      const notesInput = document.getElementById('measurement-notes');
+      const notesDisplay = document.getElementById('export-notes-display');
+      const notesText = document.getElementById('print-notes-text');
+
+      interactiveContainer.style.display = 'none';
+      exportTable.style.display = 'block';
+
+      if (notesInput.value.trim()) {
+        notesText.innerText = notesInput.value;
+        notesDisplay.classList.remove('hidden');
+      }
+
+      const originalWidth = element.style.width;
+      element.style.width = '794px';
+
+      html2canvas(element, { scale: 2, useCORS: true, windowWidth: 794 }).then(canvas => {
+        const link = document.createElement('a');
+        link.download = `Measurement-Sheet-${Date.now()}.png`;
+        link.href = canvas.toDataURL('image/png');
+        link.click();
+      }).finally(() => {
+        element.style.width = originalWidth;
+        interactiveContainer.style.display = 'block';
+        exportTable.style.display = 'none';
+        if (!notesInput.value.trim()) notesDisplay.classList.add('hidden');
+      });
+    }
+  </script>
+</body>
+</html>
