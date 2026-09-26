@@ -1,0 +1,577 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Area Measurement & Calculation Tool — Easy Invoice</title>
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- FontAwesome Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <!-- html2canvas for Image Download -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+  <style>
+    /* Styling print styles and export modes */
+    @media print {
+      body * { visibility: hidden; }
+      #printable-area, #printable-area * { visibility: visible; }
+      #printable-area { position: absolute; left: 0; top: 0; width: 100%; margin: 0; padding: 15px; box-shadow: none !important; }
+      .no-print { display: none !important; }
+      .print-only-table { display: table !important; }
+      .interactive-only { display: none !important; }
+    }
+    .print-only-table { display: none; }
+  
+    /* Clean export mode used by Image/PDF as well as print */
+    #printable-area.export-clean .no-print,
+    #printable-area.export-clean .interactive-only {
+      display: none !important;
+    }
+    #printable-area.export-clean .print-only-table {
+      display: block !important;
+    }
+</style>
+</head>
+<body class="bg-slate-50 text-slate-800 min-h-screen flex flex-col font-sans antialiased">
+  <header class="sticky top-0 z-40 bg-white shadow-sm no-print">
+    <div class="max-w-7xl mx-auto px-4 py-3 flex justify-between items-center">
+      <a href="index.html" class="flex items-center gap-2.5 focus:outline-none group">
+        <div class="w-10 h-10 rounded-full bg-slate-900 text-white flex items-center justify-center text-lg group-hover:bg-slate-700 transition">
+          <i class="fa-solid fa-file-invoice-dollar"></i>
+        </div>
+        <span class="tracking-tight text-slate-900 font-bold text-lg md:text-xl">Easy Invoice</span>
+      </a>
+      <a href="index.html" class="px-3.5 py-2 rounded-xl text-xs md:text-sm font-semibold bg-slate-100 hover:bg-slate-200 text-slate-700 transition flex items-center gap-1.5">
+        <i class="fa-solid fa-arrow-left"></i>
+        <span>Back to Home</span>
+      </a>
+    </div>
+  </header>
+
+  <main class="flex-grow max-w-4xl w-full mx-auto px-3 md:px-4 py-6 space-y-6">
+    <!-- Controls & Actions -->
+    <div class="bg-white p-4 md:p-6 rounded-3xl shadow-sm border border-slate-200 flex flex-col sm:flex-row justify-between items-center gap-4 no-print">
+      <div>
+        <h1 class="text-xl md:text-2xl font-black text-slate-900 flex items-center gap-2">
+          <i class="fa-solid fa-ruler-combined text-amber-500"></i>
+          <span>Area Measurement Calculator</span>
+        </h1>
+        <p class="text-xs text-slate-500">Add areas using decimal feet, subtract deductions where needed, and export a clean measurement report.</p>
+      </div>
+      <div class="flex items-center gap-2 w-full sm:w-auto flex-wrap">
+        <button onclick="clearMeasurementSheet()" class="flex-1 sm:flex-none px-4 py-2.5 bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200 rounded-xl font-semibold transition flex items-center justify-center gap-2 text-sm"><i class="fa-solid fa-rotate-left"></i><span>Clear</span></button>
+        <button onclick="downloadAsImage()" class="flex-1 sm:flex-none px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-semibold transition flex items-center justify-center gap-2 text-sm shadow-sm">
+          <i class="fa-solid fa-file-image"></i>
+          <span>Image</span>
+        </button>
+        <button onclick="shareMeasurementPDF(this)" class="flex-1 sm:flex-none px-4 py-2.5 bg-slate-900 hover:bg-slate-700 text-white rounded-xl font-semibold transition flex items-center justify-center gap-2 text-sm shadow-sm">
+          <i class="fa-solid fa-share-nodes"></i>
+          <span>Share</span>
+        </button>
+
+      </div>
+    </div>
+
+    <div id="printable-area" class="bg-white p-4 sm:p-6 md:p-10 rounded-3xl shadow-xl border border-slate-200 space-y-6">
+      <!-- Header Info -->
+      <div class="flex flex-col sm:flex-row justify-between items-start border-b pb-6 gap-4">
+        <div>
+          <h2 id="sheet-firm-name" class="text-xl font-black text-slate-900">Your Firm Name</h2>
+          <p id="sheet-firm-address" class="text-xs text-slate-500 mt-0.5 whitespace-pre-line"></p>
+        </div>
+        <div class="text-left sm:text-right w-full sm:w-auto">
+          <h3 class="text-lg font-bold text-amber-600 uppercase tracking-wider">Measurement Sheet</h3>
+          <p class="text-xs text-slate-500 mt-1">Date: <span id="sheet-date"></span></p>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4 bg-slate-50 p-4 rounded-2xl border border-slate-100 no-print">
+        <div class="relative">
+          <label class="block text-xs font-bold text-slate-700 mb-1">Select / Search Client</label>
+          <input type="text" id="client-search" placeholder="Type client name..." oninput="handleClientSearch()" class="w-full px-3.5 py-2.5 bg-white border rounded-xl text-sm outline-none focus:ring-2 focus:ring-amber-500" autocomplete="off">
+          <div id="client-dropdown" class="absolute left-0 right-0 top-full mt-1 bg-white border border-slate-200 rounded-xl shadow-lg max-h-40 overflow-y-auto z-30 hidden"></div>
+        </div>
+        <div>
+          <label class="block text-xs font-bold text-slate-700 mb-1">Calculation Unit</label>
+          <select id="measurement-unit" onchange="handleMeasurementUnitChange()" class="w-full px-3.5 py-2.5 bg-white border rounded-xl text-sm outline-none focus:ring-2 focus:ring-amber-500">
+            <option value="sqft">Square Feet (Sq. Ft.)</option>
+            <option value="sqm">Square Meters (Sq. Mtrs)</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Static Client View for Print/Export -->
+      <div id="client-print-view" class="hidden bg-slate-50 p-4 rounded-2xl border border-slate-100">
+        <h4 class="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1">Client Details:</h4>
+        <p id="print-client-name" class="font-bold text-slate-900 text-sm"></p>
+        <p id="print-client-contact" class="text-xs text-slate-600"></p>
+        <p id="print-client-address" class="text-xs text-slate-600 whitespace-pre-line"></p>
+      </div>
+
+      <div class="space-y-4">
+        <div class="flex justify-between items-center">
+          <h4 class="text-xs font-bold text-slate-700 uppercase tracking-wider">Measurements & Areas</h4>
+          <button onclick="openMeasurementModal()" class="no-print w-36 h-11 bg-amber-500 hover:bg-amber-600 text-white rounded-xl text-xs font-bold shadow-sm transition flex items-center justify-center gap-1.5">
+            <i class="fa-solid fa-plus"></i> Add Area
+          </button>
+        </div>
+
+        <!-- Interactive Rooms Container (Cards for data entry) -->
+        <div id="measurement-rows-container" class="space-y-3 interactive-only"></div>
+
+        <div class="interactive-only pt-4 mt-4 border-t border-slate-200">
+          <div class="flex justify-between items-center mb-3">
+            <div>
+              <h4 class="text-xs font-bold text-slate-700 uppercase tracking-wider">Deductions</h4>
+              <p class="text-[11px] text-slate-400 mt-0.5">Windows, doors, openings or any area to subtract.</p>
+            </div>
+            <button onclick="openDeductionModal()" class="no-print w-36 h-11 bg-rose-500 hover:bg-rose-600 text-white rounded-xl text-xs font-bold shadow-sm transition flex items-center justify-center gap-1.5">
+              <i class="fa-solid fa-minus"></i> Add Deduction
+            </button>
+          </div>
+          <div id="deduction-rows-container" class="space-y-3"></div>
+        </div>
+
+        <!-- Professional Export Table Format -->
+        <div id="export-table-container" class="print-only-table w-full overflow-x-auto border border-slate-200 rounded-2xl bg-white">
+          <table class="w-full text-left border-collapse">
+            <thead>
+              <tr class="bg-slate-100 border-b border-slate-200 text-slate-700 text-xs uppercase tracking-wider">
+                <th class="p-3 font-bold">Measurement / Deduction</th>
+                <th class="p-3 font-bold">Length</th>
+                <th class="p-3 font-bold">Width</th>
+                <th class="p-3 font-bold text-right">Total</th>
+              </tr>
+            </thead>
+            <tbody id="export-table-body" class="divide-y divide-slate-100 text-xs text-slate-800">
+              <!-- Dynamically populated tabular rows -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="flex justify-end pt-2">
+        <div class="w-full sm:w-96 bg-white rounded-2xl border border-slate-200 overflow-hidden">
+          <div class="flex justify-between items-center px-4 py-3 text-xs text-slate-600 border-b border-slate-100">
+            <span class="font-semibold">Gross / Total Area</span>
+            <span id="gross-total-area" class="font-bold text-slate-900">0.00 Sq. Ft.</span>
+          </div>
+          <div class="flex justify-between items-center px-4 py-3 text-xs text-rose-600 border-b border-slate-100">
+            <span class="font-semibold">Less: Deductible Area</span>
+            <span id="deduction-total-area" class="font-bold">−0.00 Sq. Ft.</span>
+          </div>
+          <div class="flex justify-between items-center px-4 py-3 bg-amber-50 text-sm text-amber-900">
+            <span class="font-black">Net Area</span>
+            <span id="grand-total-area" class="font-black">0.00 Sq. Ft.</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="space-y-2 pt-2 no-print">
+        <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider">Additional Description / Notes</label>
+        <textarea id="measurement-notes" rows="3" placeholder="Enter any extra notes or specifications regarding measurements..." class="w-full px-3.5 py-2.5 border rounded-2xl text-xs outline-none focus:ring-2 focus:ring-amber-500"></textarea>
+      </div>
+      <div id="export-notes-display" class="hidden space-y-1 pt-2">
+        <h5 class="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Notes:</h5>
+        <p id="print-notes-text" class="text-xs text-slate-700 whitespace-pre-line"></p>
+      </div>
+
+      <!-- Footer Signature -->
+      <div class="pt-8 flex justify-between items-end border-t border-slate-200">
+        <div>
+          <p class="text-[10px] text-slate-400">Computer-generated measurement sheet.</p>
+         
+        </div>
+        <div class="text-center">
+          <div class="h-10 border-b border-slate-400 mb-1 w-32 md:w-40"></div>
+          <p id="sheet-sign-name" class="text-xs font-bold text-slate-800">Authorized Signatory</p>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <div id="measurement-modal" class="fixed inset-0 z-50 bg-slate-900/60 hidden items-start sm:items-center justify-center p-2 sm:p-4 overflow-y-auto">
+    <div class="bg-white w-full max-w-md rounded-3xl shadow-2xl my-2 max-h-[calc(100dvh-1rem)] flex flex-col overflow-hidden">
+      <div class="p-4 border-b flex justify-between gap-3"><div><h3 class="text-lg font-black">Add Measurement</h3><p class="text-xs text-slate-500 mt-1">Use decimal feet, e.g. 19.5 × 12.6.</p></div><button onclick="closeMeasurementModal()" class="w-10 h-10 rounded-full bg-slate-100"><i class="fa-solid fa-xmark"></i></button></div>
+      <div class="p-4 space-y-3 overflow-y-auto" style="scroll-padding-bottom:8rem">
+        <div><label class="block text-xs font-bold mb-1">Area / Room Name *</label><input id="measure-name" type="text" placeholder="Living Room" class="w-full px-3 py-2.5 border rounded-xl text-sm"></div>
+        <div class="grid grid-cols-2 gap-3"><div><label class="block text-xs font-bold mb-1" id="measure-length-label">Length (ft) *</label><input id="measure-length" type="number" inputmode="decimal" step="0.01" min="0" placeholder="19.5" oninput="updateMeasurementPreview()" class="w-full px-3 py-2.5 border rounded-xl"></div><div><label class="block text-xs font-bold mb-1" id="measure-width-label">Width (ft) *</label><input id="measure-width" type="number" inputmode="decimal" step="0.01" min="0" placeholder="12.6" oninput="updateMeasurementPreview()" class="w-full px-3 py-2.5 border rounded-xl"></div></div>
+        
+        <div class="flex justify-between p-3 bg-amber-50 border border-amber-200 rounded-xl"><span class="text-xs font-bold">Area</span><span id="measure-net-preview" class="font-black">0.00 Sq. Ft.</span></div>
+        <div id="measure-success" class="hidden p-2.5 rounded-xl border border-emerald-200 bg-emerald-50 text-xs font-semibold text-emerald-700">✓ Measurement added. Add another, or tap Done.</div>
+        <p id="measure-error" class="hidden text-xs font-semibold text-rose-600"></p>
+        <button onclick="saveMeasurementFromModal()" class="w-full py-3 rounded-xl bg-amber-500 text-white font-bold">Add &amp; Continue</button>
+        <button onclick="closeMeasurementModal()" class="w-full py-3 rounded-xl border font-semibold">Done</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="deduction-modal" class="fixed inset-0 z-50 bg-slate-900/60 hidden items-start sm:items-center justify-center p-2 sm:p-4 overflow-y-auto">
+    <div class="bg-white w-full max-w-md rounded-3xl shadow-2xl my-2 max-h-[calc(100dvh-1rem)] flex flex-col overflow-hidden">
+      <div class="p-4 border-b flex justify-between gap-3"><div><h3 class="text-lg font-black">Add Deduction</h3><p class="text-xs text-slate-500 mt-1">Name the deduction and enter its decimal dimensions.</p></div><button onclick="closeDeductionModal()" class="w-10 h-10 rounded-full bg-slate-100"><i class="fa-solid fa-xmark"></i></button></div>
+      <div class="p-4 space-y-3 overflow-y-auto" style="scroll-padding-bottom:8rem">
+        <div><label class="block text-xs font-bold mb-1">Deduction Name *</label><input id="deduct-name" type="text" placeholder="e.g. Room 1 Window" class="w-full px-3 py-2.5 border rounded-xl text-sm"></div>
+        <div class="grid grid-cols-2 gap-3">
+          <div><label class="block text-xs font-bold mb-1" id="deduct-length-label">Length (ft) *</label><input id="deduct-length" type="number" inputmode="decimal" step="0.01" min="0" placeholder="3" oninput="updateDeductionPreview()" class="w-full px-3 py-2.5 border rounded-xl"></div>
+          <div><label class="block text-xs font-bold mb-1" id="deduct-width-label">Width (ft) *</label><input id="deduct-width" type="number" inputmode="decimal" step="0.01" min="0" placeholder="3" oninput="updateDeductionPreview()" class="w-full px-3 py-2.5 border rounded-xl"></div>
+        </div>
+        <div class="flex justify-between p-3 bg-rose-50 border border-rose-200 rounded-xl"><span class="text-xs font-bold text-rose-700">Deductible Area</span><span id="deduction-preview" class="font-black text-rose-700">0.00 Sq. Ft.</span></div>
+        <div id="deduction-success" class="hidden p-2.5 rounded-xl border border-emerald-200 bg-emerald-50 text-xs font-semibold text-emerald-700">✓ Deduction added. Add another, or tap Done.</div>
+        <p id="deduction-error" class="hidden text-xs font-semibold text-rose-600"></p>
+        <button onclick="saveDeductionFromModal()" class="w-full py-3 rounded-xl bg-rose-500 text-white font-bold"><i class="fa-solid fa-minus mr-1"></i> Add &amp; Continue</button>
+        <button onclick="closeDeductionModal()" class="w-full py-3 rounded-xl border font-semibold">Done</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="resume-measurement-modal" class="fixed inset-0 z-[70] bg-slate-900/60 hidden items-center justify-center p-4">
+    <div class="bg-white w-full max-w-sm rounded-3xl shadow-2xl p-5">
+      <div class="w-12 h-12 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center text-xl"><i class="fa-solid fa-clock-rotate-left"></i></div>
+      <h3 class="mt-4 text-xl font-black text-slate-900">Existing measurement found</h3>
+      <p class="mt-2 text-sm text-slate-500 leading-relaxed">You already have measurement data saved on this device. Would you like to continue editing it or clear it and start a new sheet?</p>
+      <div id="resume-measurement-summary" class="mt-4 p-3 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-600"></div>
+      <button onclick="continueExistingMeasurement()" class="mt-4 w-full h-12 rounded-xl bg-slate-900 text-white font-bold"><i class="fa-solid fa-pen mr-2"></i>Continue Existing</button>
+      <button onclick="startFreshMeasurement()" class="mt-2 w-full h-12 rounded-xl border border-rose-200 bg-rose-50 text-rose-600 font-bold"><i class="fa-solid fa-trash-can mr-2"></i>Clear &amp; Start New</button>
+    </div>
+  </div>
+
+  <script>
+    let currentUserId = '';
+    let companyProfile = { name: '', address: '', logo: '' };
+    let savedClients = [];
+    let selectedClient = null;
+    let measurementRows = [];
+    let deductionRows = [];
+    let editingMeasurementIndex = null;
+    let editingDeductionIndex = null;
+
+    window.onload = function() {
+      initUserIdentity();
+      loadCompanyProfile();
+      loadSavedClients();
+      const hasExistingMeasurement = loadMeasurementDraft();
+      document.getElementById('sheet-date').innerText = new Date().toISOString().split('T')[0];
+      renderRows();
+      const metric=document.getElementById('measurement-unit').value==='sqm';
+      const linear=metric?'mtr':'ft';
+      document.getElementById('measure-length-label').textContent=`Length (${linear}) *`;
+      document.getElementById('measure-width-label').textContent=`Width (${linear}) *`;
+      document.getElementById('deduct-length-label').textContent=`Length (${linear}) *`;
+      document.getElementById('deduct-width-label').textContent=`Width (${linear}) *`;
+      if (hasExistingMeasurement) showResumeMeasurementPrompt();
+    };
+
+    function initUserIdentity() {
+      let userId = localStorage.getItem('easyinvoice_user_id');
+      if (!userId) {
+        userId = 'usr_' + Math.random().toString(36).substr(2, 9) + '_' + Date.now();
+        localStorage.setItem('easyinvoice_user_id', userId);
+      }
+      currentUserId = userId;
+    }
+
+    function loadCompanyProfile() {
+      const stored = localStorage.getItem(`easyinvoice_${currentUserId}_profile`) || localStorage.getItem('easyinvoice_profile');
+      if (stored) {
+        companyProfile = JSON.parse(stored);
+        document.getElementById('sheet-firm-name').innerText = companyProfile.name || 'Your Firm Name';
+        document.getElementById('sheet-firm-address').innerText = companyProfile.address || '';
+        document.getElementById('sheet-sign-name').innerText = companyProfile.name || 'Authorized Signatory';
+      }
+    }
+
+    function loadSavedClients() {
+      const stored = localStorage.getItem(`easyinvoice_${currentUserId}_clients`) || localStorage.getItem('easyinvoice_clients');
+      if (stored) savedClients = JSON.parse(stored);
+    }
+
+    function measurementDraftKey(){return `easyinvoice_${currentUserId}_measurement_draft`;}
+    function saveMeasurementDraft(){
+      localStorage.setItem(measurementDraftKey(),JSON.stringify({
+        measurements:measurementRows,deductions:deductionRows,
+        unit:document.getElementById('measurement-unit')?.value||'sqft',
+        notes:document.getElementById('measurement-notes')?.value||'',client:selectedClient
+      }));
+    }
+    function loadMeasurementDraft(){
+      try{
+        const raw=localStorage.getItem(measurementDraftKey());if(!raw)return false;
+        const d=JSON.parse(raw);
+        measurementRows=Array.isArray(d.measurements)?d.measurements:[];
+        deductionRows=Array.isArray(d.deductions)?d.deductions:[];
+        if(d.unit)document.getElementById('measurement-unit').value=d.unit;
+        document.getElementById('measurement-notes').value=d.notes||'';
+        if(d.client){selectedClient=d.client;document.getElementById('client-search').value=d.client.name||'';updateClientPrintView();}
+        return measurementRows.length>0 || deductionRows.length>0 || !!(d.notes||'').trim() || !!d.client;
+      }catch(e){return false;}
+    }
+
+    function showResumeMeasurementPrompt(){
+      const modal=document.getElementById('resume-measurement-modal');
+      const gross=measurementRows.reduce((t,r)=>t+(+r.length||0)*(+r.width||0),0);
+      const ded=deductionRows.reduce((t,r)=>t+(+r.length||0)*(+r.width||0),0);
+      document.getElementById('resume-measurement-summary').innerHTML=
+        `<div class="flex justify-between"><span>Measurements</span><strong>${measurementRows.length}</strong></div>
+         <div class="flex justify-between mt-1"><span>Deductions</span><strong>${deductionRows.length}</strong></div>
+         <div class="flex justify-between mt-1 pt-1 border-t"><span>Current net area</span><strong>${formatCurrentArea(Math.max(0,gross-ded))}</strong></div>`;
+      modal.classList.remove('hidden');modal.classList.add('flex');
+    }
+
+    function continueExistingMeasurement(){
+      const modal=document.getElementById('resume-measurement-modal');
+      modal.classList.add('hidden');modal.classList.remove('flex');
+    }
+
+    function startFreshMeasurement(){
+      measurementRows=[];deductionRows=[];selectedClient=null;
+      document.getElementById('client-search').value='';
+      document.getElementById('measurement-notes').value='';
+      document.getElementById('measurement-unit').value='sqft';
+      localStorage.removeItem(measurementDraftKey());
+      updateClientPrintView();renderRows();
+      const modal=document.getElementById('resume-measurement-modal');
+      modal.classList.add('hidden');modal.classList.remove('flex');
+    }
+    function formatCurrentArea(sqft){
+      return document.getElementById('measurement-unit').value==='sqm'
+        ? (sqft/10.7639104167).toFixed(2)+' Sq. Mtr.'
+        : sqft.toFixed(2)+' Sq. Ft.';
+    }
+
+    function handleMeasurementUnitChange(){
+      const metric=document.getElementById('measurement-unit').value==='sqm';
+      const linear=metric?'mtr':'ft';
+      document.getElementById('measure-length-label').textContent=`Length (${linear}) *`;
+      document.getElementById('measure-width-label').textContent=`Width (${linear}) *`;
+      document.getElementById('deduct-length-label').textContent=`Length (${linear}) *`;
+      document.getElementById('deduct-width-label').textContent=`Width (${linear}) *`;
+      document.getElementById('measure-length').placeholder=metric?'5.94':'19.5';
+      document.getElementById('measure-width').placeholder=metric?'3.84':'12.6';
+      document.getElementById('deduct-length').placeholder=metric?'0.91':'3';
+      document.getElementById('deduct-width').placeholder=metric?'0.91':'3';
+      saveMeasurementDraft();
+      renderRows();
+      updateMeasurementPreview();
+      updateDeductionPreview();
+    }
+
+    function clearMeasurementSheet(){
+      if(!confirm('Clear all measurements, deductions, selected client and notes and start a fresh sheet?'))return;
+      measurementRows=[];deductionRows=[];selectedClient=null;
+      document.getElementById('client-search').value='';
+      document.getElementById('measurement-notes').value='';
+      document.getElementById('measurement-unit').value='sqft';
+      localStorage.removeItem(measurementDraftKey());
+      updateClientPrintView();renderRows();window.scrollTo({top:0,behavior:'smooth'});
+    }
+
+    function handleClientSearch() {
+      const query = document.getElementById('client-search').value.trim().toLowerCase();
+      const dropdown = document.getElementById('client-dropdown');
+      if (!query) {
+        dropdown.classList.add('hidden');
+        selectedClient = null;
+        updateClientPrintView();
+        return;
+      }
+      const matches = savedClients.filter(c => c.name.toLowerCase().includes(query));
+      if (matches.length > 0) {
+        dropdown.innerHTML = '';
+        matches.forEach(m => {
+          const div = document.createElement('div');
+          div.className = 'px-4 py-2.5 hover:bg-slate-50 cursor-pointer text-xs border-b last:border-b-0';
+          div.innerHTML = `<div class="font-bold text-slate-800">${m.name}</div><div class="text-slate-500">${m.mobile || ''}</div>`;
+          div.onmousedown = function() { selectClient(m); };
+          dropdown.appendChild(div);
+        });
+        dropdown.classList.remove('hidden');
+      } else {
+        dropdown.classList.add('hidden');
+      }
+    }
+
+    function selectClient(client) {
+      selectedClient = client;
+      document.getElementById('client-search').value = client.name;
+      document.getElementById('client-dropdown').classList.add('hidden');
+      updateClientPrintView();
+      saveMeasurementDraft();
+    }
+
+    function updateClientPrintView() {
+      const printView = document.getElementById('client-print-view');
+      if (selectedClient) {
+        document.getElementById('print-client-name').innerText = selectedClient.name;
+        document.getElementById('print-client-contact').innerText = [selectedClient.mobile, selectedClient.email].filter(Boolean).join(' | ');
+        document.getElementById('print-client-address').innerText = selectedClient.address || '';
+        printView.classList.remove('hidden');
+      } else {
+        printView.classList.add('hidden');
+      }
+    }
+
+    function clearFieldError(el){el?.classList.remove('border-rose-500','ring-2','ring-rose-200');}
+    document.addEventListener('input',e=>{
+      if(e.target?.closest('#measurement-modal,#deduction-modal')) clearFieldError(e.target);
+    });
+    document.addEventListener('focusin',e=>{
+      if(e.target?.closest('#measurement-modal,#deduction-modal')&&e.target.matches('input')) setTimeout(()=>e.target.scrollIntoView({behavior:'smooth',block:'center'}),250);
+    });
+
+    function openMeasurementModal(index=null){
+      resetMeasurementModal(); editingMeasurementIndex=index;
+      if(index!==null){const r=measurementRows[index];document.getElementById('measure-name').value=r.name;document.getElementById('measure-length').value=r.length;document.getElementById('measure-width').value=r.width;updateMeasurementPreview();}
+      const m=document.getElementById('measurement-modal');m.classList.remove('hidden');m.classList.add('flex');setTimeout(()=>document.getElementById('measure-name').focus(),50);}
+    function closeMeasurementModal(){const m=document.getElementById('measurement-modal');m.classList.add('hidden');m.classList.remove('flex');}
+    function resetMeasurementModal(keep=false){
+      ['measure-name','measure-length','measure-width'].forEach(id=>{const e=document.getElementById(id);e.value='';clearFieldError(e);});
+      document.getElementById('measure-net-preview').textContent='0.00 Sq. Ft.';
+      document.getElementById('measure-error').classList.add('hidden');
+      if(!keep)document.getElementById('measure-success').classList.add('hidden');
+    }
+    function val(id){const n=parseFloat(document.getElementById(id).value);return Number.isFinite(n)?n:0;}
+    function updateMeasurementPreview(){document.getElementById('measure-net-preview').textContent=(val('measure-length')*val('measure-width')).toFixed(2)+(document.getElementById('measurement-unit').value==='sqm'?' Sq. Mtr.':' Sq. Ft.');}
+    function invalid(id,msg,errorId='measure-error'){const e=document.getElementById(id);e.classList.add('border-rose-500','ring-2','ring-rose-200');const x=document.getElementById(errorId);x.textContent=msg;x.classList.remove('hidden');e.focus();}
+    function saveMeasurementFromModal(){
+      const name=document.getElementById('measure-name').value.trim(),length=val('measure-length'),width=val('measure-width');
+      if(!name)return invalid('measure-name','Enter an area / room name.');
+      if(length<=0)return invalid('measure-length','Length must be greater than zero.');
+      if(width<=0)return invalid('measure-width','Width must be greater than zero.');
+      const data={name,length,width,unit:document.getElementById('measurement-unit').value};
+      if(editingMeasurementIndex!==null){measurementRows[editingMeasurementIndex]=data;editingMeasurementIndex=null;}else measurementRows.push(data);
+      renderRows();document.getElementById('measure-success').classList.remove('hidden');resetMeasurementModal(true);setTimeout(()=>document.getElementById('measure-name').focus(),30);
+    }
+
+    function openDeductionModal(index=null){
+      resetDeductionModal(); editingDeductionIndex=index;
+      if(index!==null){const r=deductionRows[index];document.getElementById('deduct-name').value=r.name;document.getElementById('deduct-length').value=r.length;document.getElementById('deduct-width').value=r.width;updateDeductionPreview();}
+      const m=document.getElementById('deduction-modal');m.classList.remove('hidden');m.classList.add('flex');setTimeout(()=>document.getElementById('deduct-name').focus(),50);}
+    function closeDeductionModal(){const m=document.getElementById('deduction-modal');m.classList.add('hidden');m.classList.remove('flex');}
+    function resetDeductionModal(keep=false){
+      ['deduct-name','deduct-length','deduct-width'].forEach(id=>{const e=document.getElementById(id);e.value='';clearFieldError(e);});
+      document.getElementById('deduction-preview').textContent='0.00 Sq. Ft.';
+      document.getElementById('deduction-error').classList.add('hidden');
+      if(!keep)document.getElementById('deduction-success').classList.add('hidden');
+    }
+    function updateDeductionPreview(){document.getElementById('deduction-preview').textContent=(val('deduct-length')*val('deduct-width')).toFixed(2)+(document.getElementById('measurement-unit').value==='sqm'?' Sq. Mtr.':' Sq. Ft.');}
+    function saveDeductionFromModal(){
+      const name=document.getElementById('deduct-name').value.trim(),length=val('deduct-length'),width=val('deduct-width');
+      if(!name)return invalid('deduct-name','Enter a deduction name.','deduction-error');
+      if(length<=0)return invalid('deduct-length','Length must be greater than zero.','deduction-error');
+      if(width<=0)return invalid('deduct-width','Width must be greater than zero.','deduction-error');
+      const data={name,length,width,unit:document.getElementById('measurement-unit').value};
+      if(editingDeductionIndex!==null){deductionRows[editingDeductionIndex]=data;editingDeductionIndex=null;}else deductionRows.push(data);
+      renderRows();document.getElementById('deduction-success').classList.remove('hidden');resetDeductionModal(true);setTimeout(()=>document.getElementById('deduct-name').focus(),30);
+    }
+    function removeMeasurementRow(i){measurementRows.splice(i,1);renderRows();}
+    function removeDeductionRow(i){deductionRows.splice(i,1);renderRows();}
+
+    function renderRows(){
+      const c=document.getElementById('measurement-rows-container'),dc=document.getElementById('deduction-rows-container'),tb=document.getElementById('export-table-body');
+      c.innerHTML='';dc.innerHTML='';tb.innerHTML='';
+      const unit=document.getElementById('measurement-unit').value;
+      const toSqFt=(area,rowUnit)=>(rowUnit==='sqm'?area*10.7639104167:area);
+      const fromSqFt=area=>unit==='sqm'?area/10.7639104167:area;
+      const fmt=a=>fromSqFt(a).toFixed(2)+(unit==='sqm'?' Sq. Mtr.':' Sq. Ft.');
+      if(!measurementRows.length)c.innerHTML='<div class="p-5 text-center text-slate-400 bg-slate-50 rounded-2xl border border-dashed"><p class="text-sm font-bold text-slate-600">No measurements added yet</p><p class="text-xs mt-1">Tap Add Area to begin.</p></div>';
+      if(!deductionRows.length)dc.innerHTML='<div class="p-4 text-center text-slate-400 bg-slate-50 rounded-2xl border border-dashed text-xs">No deductions added.</div>';
+      let gross=0,deduct=0;
+      measurementRows.forEach((r,i)=>{
+        const nativeArea=(+r.length||0)*(+r.width||0),area=toSqFt(nativeArea,r.unit||'sqft');gross+=area;
+        const card=document.createElement('div');card.className='bg-white p-4 rounded-2xl border shadow-sm';
+        card.innerHTML=`<div class="flex justify-between"><div><div class="font-bold text-sm">${r.name}</div><div class="text-xs text-slate-500 mt-1">${r.length} × ${r.width}</div><div class="font-black text-amber-700 mt-2">${fmt(area)}</div></div><div class="flex gap-2"><button onclick="openMeasurementModal(${i})" class="w-9 h-9 rounded-xl bg-indigo-50 text-indigo-600" title="Edit"><i class="fa-solid fa-pen"></i></button><button onclick="removeMeasurementRow(${i})" class="w-9 h-9 rounded-xl bg-rose-50 text-rose-600" title="Delete"><i class="fa-solid fa-trash"></i></button></div></div>`;c.appendChild(card);
+        const tr=document.createElement('tr');tr.innerHTML=`<td class="p-3 font-semibold">${r.name}<div class="text-[10px] text-emerald-600 font-normal">Measurement</div></td><td class="p-3">${r.length}</td><td class="p-3">${r.width}</td><td class="p-3 text-right font-bold">${fmt(area)}</td>`;tb.appendChild(tr);
+      });
+      deductionRows.forEach((r,i)=>{
+        const nativeArea=(+r.length||0)*(+r.width||0),area=toSqFt(nativeArea,r.unit||'sqft');deduct+=area;
+        const card=document.createElement('div');card.className='bg-rose-50 p-4 rounded-2xl border border-rose-100';
+        card.innerHTML=`<div class="flex justify-between"><div><div class="font-bold text-sm">${r.name}</div><div class="text-xs text-slate-500 mt-1">${r.length} × ${r.width}</div><div class="font-black text-rose-600 mt-2">−${fmt(area)}</div></div><div class="flex gap-2"><button onclick="openDeductionModal(${i})" class="w-9 h-9 rounded-xl bg-white text-indigo-600" title="Edit"><i class="fa-solid fa-pen"></i></button><button onclick="removeDeductionRow(${i})" class="w-9 h-9 rounded-xl bg-white text-rose-600" title="Delete"><i class="fa-solid fa-trash"></i></button></div></div>`;dc.appendChild(card);
+        const tr=document.createElement('tr');tr.className='bg-rose-50/40';tr.innerHTML=`<td class="p-3 font-semibold">${r.name}<div class="text-[10px] text-rose-500 font-normal">Deduction</div></td><td class="p-3">${r.length}</td><td class="p-3">${r.width}</td><td class="p-3 text-right font-bold text-rose-600">−${fmt(area)}</td>`;tb.appendChild(tr);
+      });
+      if(!measurementRows.length&&!deductionRows.length)tb.innerHTML='<tr><td colspan="4" class="p-6 text-center text-slate-400">No measurements added.</td></tr>';
+      document.getElementById('gross-total-area').textContent=fmt(gross);
+      document.getElementById('deduction-total-area').textContent='−'+fmt(deduct);
+      document.getElementById('grand-total-area').textContent=fmt(Math.max(0,gross-deduct));
+      saveMeasurementDraft();
+    }
+
+    async function ensureJsPdf() {
+      if(window.jspdf?.jsPDF) return window.jspdf.jsPDF;
+      await new Promise((resolve,reject)=>{
+        const sc=document.createElement('script');
+        sc.src='https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
+        sc.onload=resolve; sc.onerror=reject; document.head.appendChild(sc);
+      });
+      return window.jspdf.jsPDF;
+    }
+
+    function prepareMeasurementExport() {
+      const element=document.getElementById('printable-area');
+      const notesInput=document.getElementById('measurement-notes');
+      const notesDisplay=document.getElementById('export-notes-display');
+      const notesText=document.getElementById('print-notes-text');
+      const state={width:element.style.width, notesWasHidden:notesDisplay.classList.contains('hidden')};
+      if(notesInput && notesInput.value.trim()){
+        notesText.innerText=notesInput.value.trim();
+        notesDisplay.classList.remove('hidden');
+      } else {
+        notesDisplay.classList.add('hidden');
+      }
+      element.classList.add('export-clean');
+      element.style.width='794px';
+      return state;
+    }
+
+    function restoreMeasurementExport(state) {
+      const element=document.getElementById('printable-area');
+      element.classList.remove('export-clean');
+      element.style.width=state.width;
+      const notesDisplay=document.getElementById('export-notes-display');
+      if(state.notesWasHidden) notesDisplay.classList.add('hidden');
+    }
+
+    async function makeMeasurementPDF() {
+      const element=document.getElementById('printable-area');
+      const state=prepareMeasurementExport();
+      try{
+        const canvas=await html2canvas(element,{scale:2,useCORS:true,windowWidth:794,backgroundColor:'#ffffff',
+          ignoreElements:el=>el.classList?.contains('no-print')||el.classList?.contains('interactive-only')});
+        const jsPDF=await ensureJsPdf(); const pdf=new jsPDF('p','mm','a4');
+        const img=canvas.toDataURL('image/jpeg',0.95), pageW=210, pageH=297, imgH=canvas.height*pageW/canvas.width;
+        let left=imgH,y=0;pdf.addImage(img,'JPEG',0,y,pageW,imgH);left-=pageH;
+        while(left>0){y=left-imgH;pdf.addPage();pdf.addImage(img,'JPEG',0,y,pageW,imgH);left-=pageH;}
+        return pdf.output('blob');
+      } finally { restoreMeasurementExport(state); }
+    }
+
+    async function shareMeasurementPDF(btn){
+      const original=btn.innerHTML;
+      btn.disabled=true;btn.innerHTML='<i class="fa-solid fa-spinner fa-spin"></i><span>Preparing...</span>';
+      try{
+        const blob=await makeMeasurementPDF();
+        const file=new File([blob],`Measurement-Report-${new Date().toISOString().slice(0,10)}.pdf`,{type:'application/pdf'});
+        if(navigator.canShare && navigator.canShare({files:[file]})){await navigator.share({files:[file],title:'Measurement Report'});}
+        else {const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=file.name;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000);}
+      }catch(e){alert('Could not create/share the PDF. Please try again.');}
+      finally{btn.disabled=false;btn.innerHTML=original;}
+    }
+
+    async function downloadAsImage() {
+      const element=document.getElementById('printable-area');
+      if(!element)return;
+      const state=prepareMeasurementExport();
+      try{
+        const canvas=await html2canvas(element,{scale:2,useCORS:true,windowWidth:794,backgroundColor:'#ffffff',
+          ignoreElements:el=>el.classList?.contains('no-print')||el.classList?.contains('interactive-only')});
+        const link=document.createElement('a');
+        link.download=`Measurement-Sheet-${Date.now()}.png`;
+        link.href=canvas.toDataURL('image/png');
+        link.click();
+      } finally { restoreMeasurementExport(state); }
+    }
+    document.getElementById('measurement-notes').addEventListener('input', saveMeasurementDraft);
+    document.getElementById('client-search').addEventListener('input', saveMeasurementDraft);
+
+  </script>
+</body>
+</html>
