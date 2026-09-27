@@ -20,6 +20,7 @@ function initFirebaseAuthAndSync(){
   EasyUsage.connect({auth:easyAuth,db:easyDb,counts:()=>({documents:savedDocuments.length,clients:savedClients.length}),onPolicy:showAccess,
     onIdentity:async(user,policy)=>{
       const version=++identityVersion;accessReady=false;cloudDirty=false;clearTimeout(syncTimer);cloudUser=null;cloudLoading=true;
+      documentItems=[];editingDocId=null;router('home',true);
       updateAuthUI(user&&!user.isAnonymous?user:null);
       document.getElementById('admin-link')?.remove();
       if(user?.email===EASY_ADMIN_EMAIL&&user.emailVerified){const link=document.createElement('a');link.id='admin-link';link.href='admin.html';link.textContent=' · Admin dashboard';document.getElementById('app-footer').append(link);}
