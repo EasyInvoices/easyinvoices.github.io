@@ -1,7 +1,7 @@
 'use strict';
 firebase.initializeApp(EASY_FIREBASE_CONFIG);
 const auth=firebase.auth(), db=firebase.firestore(), $=id=>document.getElementById(id);
-let admin=null, rows=[], cursor=null, selected=null, busy=false, revision=0;
+let admin=null, rows=[], cursor=null, selected=null, busy=false, revision=0, pendingAccess=null;
 function status(text,error=false){$('status').textContent=text;$('status').classList.toggle('error',error);}
 function date(value){return value?.toDate?value.toDate().toLocaleString():'Not tracked yet';}
 function add(parent,tag,text){const element=document.createElement(tag);element.textContent=text;parent.append(element);return element;}
@@ -14,7 +14,7 @@ async function action(fn){if(busy)return;busy=true;try{await fn();}catch(e){stat
 $('signin').onclick=()=>action(()=>auth.signInWithPopup(new firebase.auth.GoogleAuthProvider()));
 $('signout').onclick=()=>auth.signOut();
 auth.onAuthStateChanged(async user=>{
-  revision++;admin=null;rows=[];selected=null;$('records').replaceChildren();$('accounts').replaceChildren();$('detail').hidden=true;$('dashboard').hidden=true;
+  revision++;admin=null;rows=[];selected=null;pendingAccess=null;$('access-review').hidden=true;$('records').replaceChildren();$('accounts').replaceChildren();$('detail').hidden=true;$('dashboard').hidden=true;
   $('identity').textContent=user?.email||'';$('signout').hidden=!user;$('login').hidden=false;
   if(!user){status('Sign in to manage your site.');return;}
   const token=await user.getIdTokenResult();
@@ -44,20 +44,26 @@ $('refresh').onclick=()=>action(()=>loadAccounts());$('more').onclick=()=>action
 $('kind').onchange=()=>action(()=>loadAccounts());
 $('legacy').onclick=()=>action(async()=>{const rev=revision;const snap=await db.collectionGroup('appData').limit(25).get({source:'server'});if(rev!==revision)return;rows=snap.docs.filter(d=>/^users\/[^/]+\/appData\/main$/.test(d.ref.path)).map(d=>({id:d.ref.parent.parent.id,kind:'legacy',documents:d.data().documents?.length||0,clients:d.data().clients?.length||0}));$('more').hidden=true;render();status('Showing up to 25 older cloud accounts. Email appears after their next app sign-in.');});
 async function openAccount(row){
+  pendingAccess=null;$('access-review').hidden=true;
   const rev=revision;const snap=await db.doc('access/'+row.id).get({source:'server'});if(rev!==revision)return;selected=row;
   const policy={...EASY_DEFAULT_LIMITS,...(snap.exists?snap.data():{})};$('detail-name').textContent=row.email||row.name||'Cloud account';$('detail-id').textContent=row.id;
   $('detail-note').textContent=row.kind==='guest'?'Only activity counts are available. This guest’s invoice and client contents stay in their browser.':'Saved cloud records are available on request below.';
   $('blocked').checked=policy.blocked;for(const key of ['maxDocuments','maxClients','maxCloudSavesPerDay'])$(key).value=policy[key];
   $('save-access').disabled=row.id===admin.uid;$('load-records').hidden=row.kind==='guest';$('records').replaceChildren();$('detail').hidden=false;$('detail').scrollIntoView({behavior:'smooth'});
 }
-$('close-detail').onclick=()=>{$('detail').hidden=true;selected=null;};
+$('close-detail').onclick=()=>{$('detail').hidden=true;selected=null;pendingAccess=null;};
 $('controls').onsubmit=event=>{event.preventDefault();action(async()=>{
   if(!selected||selected.id===admin.uid)return;const target=selected.id;
   const settings={blocked:$('blocked').checked};for(const key of ['maxDocuments','maxClients','maxCloudSavesPerDay'])settings[key]=Number($(key).value);
   if(!Object.values(settings).every(v=>typeof v==='boolean'||Number.isInteger(v)))throw Error('Enter whole numbers for limits.');
-  if(!confirm(`Save these settings for ${selected.email||target}?\nAccess: ${settings.blocked?'Blocked':'Allowed'}\nDocuments: ${settings.maxDocuments}\nClients: ${settings.maxClients}\nCloud saves/day: ${settings.maxCloudSavesPerDay}`))return;
-  const batch=db.batch(),stamp=firebase.firestore.FieldValue.serverTimestamp();batch.set(db.doc('access/'+target),{...settings,updatedAt:stamp});batch.set(db.collection('adminAudit').doc(),{actor:admin.uid,target,action:'setAccess',at:stamp,settings});await batch.commit();status('Access settings saved. Cloud enforcement is immediate; an open app refreshes its access on the next check.');
+  pendingAccess={target,settings};$('access-summary').textContent=`${selected.email||target}: ${settings.blocked?'Block access':'Allow access'}, up to ${settings.maxDocuments} documents, ${settings.maxClients} clients and ${settings.maxCloudSavesPerDay} cloud saves per UTC day.`;$('access-review').hidden=false;
 });};
+$('cancel-access').onclick=()=>{pendingAccess=null;$('access-review').hidden=true;};
+$('confirm-access').onclick=()=>action(async()=>{
+  if(!pendingAccess||!admin||selected?.id!==pendingAccess.target)return;
+  const {target,settings}=pendingAccess;
+  const batch=db.batch(),stamp=firebase.firestore.FieldValue.serverTimestamp();batch.set(db.doc('access/'+target),{...settings,updatedAt:stamp});batch.set(db.collection('adminAudit').doc(),{actor:admin.uid,target,action:'setAccess',at:stamp,settings});await batch.commit();pendingAccess=null;$('access-review').hidden=true;status('Access settings saved. Cloud enforcement is immediate; an open app refreshes its access on the next check.');
+});
 $('load-records').onclick=()=>action(async()=>{
   if(!selected)return;const uid=selected.id,rev=revision;const snap=await db.doc(`users/${uid}/appData/main`).get({source:'server'});if(rev!==revision||selected?.id!==uid)return;$('records').replaceChildren();
   if(!snap.exists){add($('records'),'p','No cloud records saved.');return;}
