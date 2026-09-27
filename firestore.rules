@@ -17,18 +17,9 @@ service cloud.firestore {
     }
     function active(uid) { return !policy(uid).blocked; }
     function day() { return int(request.time.toMillis() / 86400000); }
-    function validAccess(d) {
-      return d.keys().hasOnly(['blocked','maxDocuments','maxClients','maxCloudSavesPerDay','updatedAt'])
-        && d.blocked is bool && d.updatedAt == request.time
-        && d.maxDocuments is int && d.maxDocuments >= 0 && d.maxDocuments <= 1000
-        && d.maxClients is int && d.maxClients >= 0 && d.maxClients <= 2000
-        && d.maxCloudSavesPerDay is int && d.maxCloudSavesPerDay >= 0 && d.maxCloudSavesPerDay <= 5000;
-    }
     match /access/{uid} {
-      allow get: if admin() || owner(uid);
-      allow list: if admin();
-      allow create, update: if admin() && uid != request.auth.uid && validAccess(request.resource.data);
-      allow delete: if false;
+      allow get: if owner(uid);
+      allow list, write: if false;
     }
     function validCloud(d, uid) {
       return d.keys().hasOnly(['profile','clients','documents','updatedAt','usageDay','cloudSavesToday'])
@@ -38,7 +29,7 @@ service cloud.firestore {
         && d.cloudSavesToday <= policy(uid).maxCloudSavesPerDay;
     }
     match /users/{uid}/appData/main {
-      allow get: if admin() || (owner(uid) && googleUser() && active(uid));
+      allow get: if owner(uid) && googleUser() && active(uid);
       allow create: if owner(uid) && googleUser() && active(uid)
         && validCloud(request.resource.data, uid)
         && request.resource.data.cloudSavesToday == 1
@@ -54,8 +45,6 @@ service cloud.firestore {
           || request.resource.data.clients.size() <= resource.data.clients.size());
       allow delete: if false;
     }
-    // Collection-group access for the administrator's on-demand legacy data view.
-    match /{path=**}/appData/{doc} { allow read: if admin(); }
     function validLocation(d) {
       return d is map && d.keys().hasOnly(['source','country','region','city','checkedAt'])
         && d.source in ['ip','unavailable']
@@ -96,16 +85,7 @@ service cloud.firestore {
         && request.resource.data.measurements <= resource.data.measurements + 500;
       allow delete: if false;
     }
-    match /adminAudit/{id} {
-      allow read: if admin();
-      allow create: if admin()
-        && request.resource.data.keys().hasOnly(['actor','target','action','at','settings'])
-        && request.resource.data.actor == request.auth.uid
-        && request.resource.data.target is string
-        && request.resource.data.action == 'setAccess'
-        && request.resource.data.at == request.time
-        && request.resource.data.settings is map;
-      allow update, delete: if false;
-    }
+    // Historical management records remain stored but are unavailable to web clients.
+    match /adminAudit/{id} { allow read, write: if false; }
   }
 }
