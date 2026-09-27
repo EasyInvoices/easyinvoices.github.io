@@ -36,7 +36,7 @@ function initFirebaseAuthAndSync(){
           cacheCurrent();cloudUser=user;accessReady=true;appMessage('Cloud records loaded. Changes are saved automatically.');
         }catch(e){appMessage('Cloud records could not be loaded. Editing is paused to protect existing data. Reload to try again.',true);throw e;}
       }else{
-        currentUserId=guestBrowserId||localStorage.getItem('easyinvoice_user_id');applyCloudData({});loadCompanyProfile();loadSavedClients();loadSavedDocuments();accessReady=true;appMessage('Guest documents stay on this device. Activity counts help manage service usage.');
+        currentUserId=guestBrowserId||localStorage.getItem('easyinvoice_user_id');applyCloudData({});loadCompanyProfile();loadSavedClients();loadSavedDocuments();accessReady=true;appMessage('');
         if(!user&&accessChoiceMade)easyAuth.signInAnonymously().catch(()=>appMessage('Guest tracking is unavailable. Documents still save on this device.',true));
       }
       cloudLoading=false;if(cloudDirty)queueCloudSync();
