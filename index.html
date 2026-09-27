@@ -772,6 +772,7 @@
     <p class="text-center text-xs px-4 pb-3 no-print"><a href="privacy.html" class="text-indigo-700 underline underline-offset-2 hover:text-indigo-900">Privacy Policy</a></p>
   </footer>
 
+  <p class="text-center text-xs text-slate-500 px-4 pb-3">Guest activity counts and Google account usage help manage service limits. The administrator can review saved cloud records. <a href="privacy.html" class="underline">Privacy details</a>.</p>
   <!-- Application Script -->
   <script>
     let currentSection = 'home';
@@ -980,6 +981,7 @@
     }
 
     function deleteClient(id) {
+      if (!canUseApp()) return;
       if (confirm('Are you sure you want to delete this client?')) {
         savedClients = savedClients.filter(c => c.id !== id);
         localStorage.setItem(`easyinvoice_${currentUserId}_clients`, JSON.stringify(savedClients));
@@ -1127,6 +1129,7 @@
       reader.onload = function(e) {
         try {
           const importedData = JSON.parse(e.target.result);
+          if (!canStore(Array.isArray(importedData.documents)?importedData.documents.length:savedDocuments.length, Array.isArray(importedData.clients)?importedData.clients.length:savedClients.length)) return;
           if (importedData && typeof importedData === 'object') {
             if (importedData.profile) {
               companyProfile = importedData.profile;
@@ -1902,6 +1905,7 @@
     }
 
     function deleteDocument(id) {
+      if (!canUseApp()) return;
       if (confirm('Are you sure you want to delete this document?')) {
         savedDocuments = savedDocuments.filter(d => d.id !== id);
         localStorage.setItem(`easyinvoice_${currentUserId}_documents`, JSON.stringify(savedDocuments));
@@ -2109,5 +2113,8 @@
     }
   </script>
 
+<script src="firebase-config.js"></script>
+<script src="usage-runtime.js"></script>
+<script src="app-controls.js"></script>
 </body>
 </html>

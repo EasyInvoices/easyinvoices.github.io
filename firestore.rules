@@ -1,0 +1,100 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() { return request.auth != null; }
+    function googleUser() {
+      return signedIn() && request.auth.token.firebase.sign_in_provider == 'google.com'
+        && request.auth.token.email_verified == true;
+    }
+    function admin() {
+      return googleUser() && request.auth.token.email == 'craftsbyzareen@gmail.com';
+    }
+    function owner(uid) { return signedIn() && request.auth.uid == uid; }
+    function policy(uid) {
+      return exists(/databases/$(database)/documents/access/$(uid))
+        ? get(/databases/$(database)/documents/access/$(uid)).data
+        : {'blocked': false, 'maxDocuments': 100, 'maxClients': 200, 'maxCloudSavesPerDay': 200};
+    }
+    function active(uid) { return !policy(uid).blocked; }
+    function day() { return int(request.time.toMillis() / 86400000); }
+    function validAccess(d) {
+      return d.keys().hasOnly(['blocked','maxDocuments','maxClients','maxCloudSavesPerDay','updatedAt'])
+        && d.blocked is bool && d.updatedAt == request.time
+        && d.maxDocuments is int && d.maxDocuments >= 0 && d.maxDocuments <= 1000
+        && d.maxClients is int && d.maxClients >= 0 && d.maxClients <= 2000
+        && d.maxCloudSavesPerDay is int && d.maxCloudSavesPerDay >= 0 && d.maxCloudSavesPerDay <= 5000;
+    }
+    match /access/{uid} {
+      allow get: if admin() || owner(uid);
+      allow list: if admin();
+      allow create, update: if admin() && uid != request.auth.uid && validAccess(request.resource.data);
+      allow delete: if false;
+    }
+    function validCloud(d, uid) {
+      return d.keys().hasOnly(['profile','clients','documents','updatedAt','usageDay','cloudSavesToday'])
+        && d.profile is map && d.clients is list && d.documents is list
+        && d.updatedAt == request.time && d.usageDay == day()
+        && d.cloudSavesToday is int && d.cloudSavesToday > 0
+        && d.cloudSavesToday <= policy(uid).maxCloudSavesPerDay;
+    }
+    match /users/{uid}/appData/main {
+      allow get: if admin() || (owner(uid) && googleUser() && active(uid));
+      allow create: if owner(uid) && googleUser() && active(uid)
+        && validCloud(request.resource.data, uid)
+        && request.resource.data.cloudSavesToday == 1
+        && request.resource.data.documents.size() <= policy(uid).maxDocuments
+        && request.resource.data.clients.size() <= policy(uid).maxClients;
+      allow update: if owner(uid) && googleUser() && active(uid)
+        && validCloud(request.resource.data, uid)
+        && request.resource.data.cloudSavesToday ==
+          (resource.data.get('usageDay', -1) == day() ? resource.data.get('cloudSavesToday', 0) + 1 : 1)
+        && (request.resource.data.documents.size() <= policy(uid).maxDocuments
+          || request.resource.data.documents.size() <= resource.data.documents.size())
+        && (request.resource.data.clients.size() <= policy(uid).maxClients
+          || request.resource.data.clients.size() <= resource.data.clients.size());
+      allow delete: if false;
+    }
+    // Collection-group access for the administrator's on-demand legacy data view.
+    match /{path=**}/appData/{doc} { allow read: if admin(); }
+    function validActivity(d) {
+      return d.keys().hasOnly(['kind','email','name','firstSeen','lastSeen','sessions','documents','clients','exports','measurements'])
+        && d.kind == (googleUser() ? 'google' : 'guest')
+        && (googleUser() || request.auth.token.firebase.sign_in_provider == 'anonymous')
+        && d.email == request.auth.token.get('email', '')
+        && d.name is string && d.name.size() <= 100
+        && d.firstSeen is timestamp && d.lastSeen == request.time
+        && d.sessions is int && d.sessions > 0 && d.sessions <= 10000000
+        && d.documents is int && d.documents >= 0 && d.documents <= 100000
+        && d.clients is int && d.clients >= 0 && d.clients <= 100000
+        && d.exports is int && d.exports >= 0 && d.exports <= 10000000
+        && d.measurements is int && d.measurements >= 0 && d.measurements <= 10000000;
+    }
+    match /activity/{uid} {
+      allow get: if admin() || owner(uid);
+      allow list: if admin();
+      allow create: if owner(uid) && active(uid) && validActivity(request.resource.data)
+        && request.resource.data.firstSeen == request.time && request.resource.data.sessions == 1;
+      allow update: if owner(uid) && active(uid) && validActivity(request.resource.data)
+        && request.time >= resource.data.lastSeen + duration.value(60, 's')
+        && request.resource.data.firstSeen == resource.data.firstSeen
+        && request.resource.data.sessions >= resource.data.sessions
+        && request.resource.data.sessions <= resource.data.sessions + 1
+        && request.resource.data.exports >= resource.data.exports
+        && request.resource.data.exports <= resource.data.exports + 500
+        && request.resource.data.measurements >= resource.data.measurements
+        && request.resource.data.measurements <= resource.data.measurements + 500;
+      allow delete: if false;
+    }
+    match /adminAudit/{id} {
+      allow read: if admin();
+      allow create: if admin()
+        && request.resource.data.keys().hasOnly(['actor','target','action','at','settings'])
+        && request.resource.data.actor == request.auth.uid
+        && request.resource.data.target is string
+        && request.resource.data.action == 'setAccess'
+        && request.resource.data.at == request.time
+        && request.resource.data.settings is map;
+      allow update, delete: if false;
+    }
+  }
+}
