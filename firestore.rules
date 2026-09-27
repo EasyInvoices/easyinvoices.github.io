@@ -56,8 +56,19 @@ service cloud.firestore {
     }
     // Collection-group access for the administrator's on-demand legacy data view.
     match /{path=**}/appData/{doc} { allow read: if admin(); }
+    function validLocation(d) {
+      return d is map && d.keys().hasOnly(['source','country','region','city','checkedAt'])
+        && d.source in ['ip','unavailable']
+        && d.country is string && d.country.size() <= 80
+        && d.region is string && d.region.size() <= 100
+        && d.city is string && d.city.size() <= 100
+        && d.checkedAt is int && d.checkedAt >= 0
+        && (d.source == 'ip' ? d.country.size() > 0 && d.checkedAt > 0
+          : d.country == '' && d.region == '' && d.city == '' && d.checkedAt == 0);
+    }
     function validActivity(d) {
-      return d.keys().hasOnly(['kind','email','name','firstSeen','lastSeen','sessions','documents','clients','exports','measurements'])
+      return d.keys().hasOnly(['kind','email','name','firstSeen','lastSeen','sessions','documents','clients','exports','measurements','location'])
+        && (!('location' in d) || validLocation(d.location))
         && d.kind == (googleUser() ? 'google' : 'guest')
         && (googleUser() || request.auth.token.firebase.sign_in_provider == 'anonymous')
         && d.email == request.auth.token.get('email', '')

@@ -12,7 +12,10 @@ window.EasyUsage = (() => {
   async function flush() {
     timer=null;
     if (!user || policy.blocked) return;
-    const current=user, uid=current.uid, batch={...pending}, metrics=counts();
+    const current=user, uid=current.uid;
+    const locationSummary=await EasyLocation.get();
+    if(user?.uid!==uid||policy.blocked)return;
+    const batch={...pending}, metrics=counts();
     try {
       const wait=await db.runTransaction(async tx=>{
         const ref=db.doc('activity/'+uid), snap=await tx.get(ref), old=snap.exists?snap.data():null;
@@ -22,7 +25,7 @@ window.EasyUsage = (() => {
         tx.set(ref,{kind:current.isAnonymous?'guest':'google',email:current.email||'',name:(current.displayName||'Guest browser').slice(0,100),
           firstSeen:old?.firstSeen||stamp(),lastSeen:stamp(),sessions:old?(old.sessions+(sessionStorage.getItem(sessionKey)?0:1)):1,
           documents:Math.min(100000,Math.max(0,metrics.documents??old?.documents??0)),clients:Math.min(100000,Math.max(0,metrics.clients??old?.clients??0)),
-          exports:(old?.exports||0)+Math.min(batch.exports,500),measurements:(old?.measurements||0)+Math.min(batch.measurements,500)});
+          exports:(old?.exports||0)+Math.min(batch.exports,500),measurements:(old?.measurements||0)+Math.min(batch.measurements,500),location:locationSummary});
         return 0;
       });
       if(user?.uid!==uid) return;

@@ -25,6 +25,10 @@ function render(){
   const needle=$('search').value.trim().toLowerCase();$('accounts').replaceChildren();
   for(const row of rows.filter(r=>[r.id,r.email,r.name].join(' ').toLowerCase().includes(needle))){
     const tr=add($('accounts'),'tr',''), who=add(tr,'td',row.email||row.name||'Older cloud account');add(who,'small',row.kind==='guest'?'Guest browser':row.kind==='legacy'?'Google · activity not recorded':'Google');
+    const place=row.location;
+    const label=place?.source==='ip'&&place.country?`Approx. ${[place.city,place.region,place.country].filter(Boolean).join(', ')}`:'Location unavailable';
+    const location=add(who,'small',label);
+    location.title=place?.source==='ip'?`IP estimate, not a verified physical location. May reflect a VPN or network gateway. Lookup: ${new Date(place.checkedAt).toLocaleString()}.`:'Appears after a future visit if the IP lookup is available.';
     add(tr,'td',date(row.lastSeen));add(tr,'td',row.sessions??'—');add(tr,'td',`${row.documents??'—'} / ${row.clients??'—'}`);add(tr,'td',`${row.exports??'—'} / ${row.measurements??'—'}`);
     const button=add(add(tr,'td',''),'button','Manage');button.onclick=()=>action(()=>openAccount(row));
   }

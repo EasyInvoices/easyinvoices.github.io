@@ -1,5 +1,7 @@
 /* Public web configuration. Database access is enforced by firestore.rules. */
 window.EASY_ADMIN_EMAIL = 'craftsbyzareen@gmail.com';
+// Approximate IP location for the private administrator activity view.
+window.EASY_LOCATION_ENABLED = true;
 window.EASY_DEFAULT_LIMITS = Object.freeze({blocked:false,maxDocuments:100,maxClients:200,maxCloudSavesPerDay:200});
 window.EASY_FIREBASE_CONFIG = Object.freeze({
   apiKey:'AIzaSyAdprSqb2LMpPoQE8VdOujjr6C-vHoWyVw',
