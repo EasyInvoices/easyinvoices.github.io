@@ -2062,6 +2062,7 @@
       const text=document.getElementById('storage-status-text'), btn=document.getElementById('storage-status-signin');
       document.querySelectorAll('.guest-only-data-action').forEach(el => el.classList.toggle('hidden', !!user));
       document.getElementById('account-data-action')?.classList.toggle('hidden', !!user);
+      if(!card || !title || !text || !btn) return;
       if(user){
         signin?.classList.add('hidden'); box?.classList.remove('hidden'); box?.classList.add('flex');
         if(name) name.textContent=user.displayName||user.email||'Google account';
